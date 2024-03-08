@@ -63,20 +63,18 @@ async function run() {
     // get bookingsinfo
     app.get('/bookings', async (req, res) => {
 
-      console.log(req.query.email);
+      // console.log(req.query.email);
 
       let query = {};
 
       if (req.query?.email) {
         query = { email: req.query.email };
       }
-      console.log(query);
+      // console.log(query);
 
       const result = await bookingCollection.find(query).toArray();
       res.send(result);
     })
-
-
 
 
 
@@ -88,6 +86,20 @@ async function run() {
       const insertBookingInfo = await bookingCollection.insertOne(bookingInfo);
 
       res.send(insertBookingInfo);
+
+    })
+
+
+    // specific booking data delete
+    app.delete('/bookings/:id', async (req, res) => {
+
+      const id = req.params.id;
+
+      const query = { _id: new ObjectId(id) };
+
+      const result = await bookingCollection.deleteOne(query);
+
+      res.send(result);
 
     })
 
