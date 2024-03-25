@@ -12,7 +12,7 @@ const port = process.env.PORT || 5000;
 
 
 
-// middleware
+// middleware from express
 app.use(cors({
 	origin: ['http://localhost:5173'],
 	credentials: true
@@ -24,7 +24,6 @@ app.use(cookieParser());
 console.log(process.env.DB_USER, process.env.DB_PASS)
 
 // Main Part
-
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.of0ix0q.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -35,6 +34,36 @@ const client = new MongoClient(uri, {
 		deprecationErrors: true,
 	}
 });
+
+// custom middleware
+const logger = async (req, res, next) => {
+	console.log('Call the logger function : ', req.hostname, req.originalUrl);
+	next();
+}
+
+// verify token by custom middleware
+const verifyToken = async (req, res, next) => {
+	const token = req.cookies.token;
+	console.log('token from verifytoken Middleware', token);
+	if (!token) {
+		return res.status(401).send({ message: 'Unauthorized' });
+	}
+	else {
+		jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+			if (err) {
+				return res.status(401).send({ message: 'Unauthorized' });
+			}
+			else {
+				console.log('Validation from decoded ', decoded);
+				req.user = decoded;
+				next();
+			}
+		})
+	}
+}
+
+
+
 
 async function run() {
 	try {
@@ -54,7 +83,7 @@ async function run() {
 					httpOnly: true,
 					secure: false
 				})
-				.send({ 'success': true })
+				.send({ success: true })
 		})
 
 
@@ -65,7 +94,9 @@ async function run() {
 		const bookingCollection = client.db('carDoctor').collection('bookings');
 
 
-		app.get('/services', async (req, res) => {
+
+		// get servises
+		app.get('/services', logger, async (req, res) => {
 			const cursor = serviceCollection.find();
 			const services = await cursor.toArray();
 			res.send(services);
@@ -86,10 +117,18 @@ async function run() {
 
 
 		// get bookingsinfo
-		app.get('/bookings', async (req, res) => {
-			console.log('SEE TOKEN', req.cookies.token);
+		app.get('/bookings', logger, verifyToken, async (req, res) => {
+
+			//  see first logger and then verifyToken middleWare console value 
+			//  when navigate to bokkings in front side 
+			//  and then see the token 
+			console.log(`"SEE TOKEN from bookings route"`, req.cookies.token);
+			console.log(`" User Decoded "`, req.user)
 
 			// console.log(req.query.email);
+			if (req.query?.email !== req.user.email) {
+				return res.status(403).send({ message: 'Forbidden access' });
+			}
 			let query = {};
 			if (req.query?.email) {
 				query = { email: req.query.email };
